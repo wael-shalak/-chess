@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#17130f">
+<meta name="description" content="Royal Chess - play against the computer or a friend on the same screen.">
+<link rel="icon" href="icons/favicon.png">
+<title>Royal Chess</title>
+<style>
+:root{
+  --bg:#17130f; --panel:#221c16; --panel2:#2b241c; --line:#3a3026;
+  --text:#f1e7d6; --muted:#b4a58e; --gold:#d6a84a; --gold2:#f0cd7a;
+  --light:#efdcbc; --dark:#b3875e; --sel:rgba(240,200,90,.55); --last:rgba(214,168,74,.38);
+  --check:radial-gradient(circle, rgba(230,40,40,.95) 0%, rgba(230,40,40,.55) 35%, rgba(230,40,40,0) 72%);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;background:radial-gradient(1200px 600px at 50% -10%, #3a2a18 0%, var(--bg) 60%)}
+.wrap{max-width:1120px;margin:0 auto;padding:18px 14px 40px;display:flex;gap:24px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+header{width:100%;text-align:center;margin-bottom:2px}
+h1{font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:clamp(20px,3.4vw,28px);margin:6px 0 0;color:var(--gold2)}
+.sub{color:var(--muted);font-size:13px;letter-spacing:.08em;margin-top:4px}
+.boardCol{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.player{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;padding:0 4px}
+.player .name{font-size:15px;color:var(--text);display:flex;align-items:center;gap:8px}
+.player .dot{width:12px;height:12px;border-radius:50%;border:1px solid #0006}
+.player.active .name{color:var(--gold2)}
+.player.active .dot{box-shadow:0 0 0 3px rgba(214,168,74,.35)}
+.caps{display:flex;align-items:center;flex-wrap:wrap;min-height:28px}
+.caps img{width:26px;height:26px;margin-left:-7px;filter:drop-shadow(0 1px 1px #0008)}
+.caps .adv{font-size:13px;color:var(--muted);margin-left:6px;font-family:system-ui,sans-serif}
+.boardFrame{padding:10px;border-radius:12px;background:linear-gradient(145deg,#5a3f22,#2e2012);box-shadow:0 18px 50px #000a, inset 0 1px 0 #ffffff22}
+#board{--sz:min(92vw, calc(100vh - 210px), 640px);width:var(--sz);height:var(--sz);display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);position:relative;border-radius:4px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+@media (max-width:860px){#board{--sz:min(calc(100vw - 36px), 640px)} .wrap{padding:12px 8px 32px} .boardFrame{padding:6px}}
+.sq{position:relative}
+.sq.l{background:var(--light)} .sq.d{background:var(--dark)}
+.sq.last::before,.sq.sel::before{content:"";position:absolute;inset:0}
+.sq.last::before{background:var(--last)}
+.sq.sel::before{background:var(--sel)}
+.sq.chk::after{content:"";position:absolute;inset:0;background:var(--check)}
+.sq .hint{position:absolute;left:50%;top:50%;width:28%;height:28%;transform:translate(-50%,-50%);border-radius:50%;background:rgba(40,25,10,.38);z-index:3;pointer-events:none}
+.sq .hint.cap{width:92%;height:92%;background:transparent;border:5px solid rgba(40,25,10,.38)}
+.sq.hover{box-shadow:inset 0 0 0 4px rgba(255,255,255,.65)}
+.coord{position:absolute;font:600 11px system-ui,sans-serif;z-index:2;pointer-events:none;opacity:.85}
+.coord.f{right:3px;bottom:1px} .coord.r{left:3px;top:2px}
+.sq.l .coord{color:var(--dark)} .sq.d .coord{color:var(--light)}
+.pc{position:absolute;inset:2%;width:96%;height:96%;object-fit:contain;z-index:4;pointer-events:none;filter:drop-shadow(0 3px 3px rgba(0,0,0,.45));transition:transform .2s ease}
+.pc.drag{transition:none;z-index:50;filter:drop-shadow(0 10px 10px rgba(0,0,0,.55));transform-origin:50% 50%}
+.side{width:340px;max-width:94vw;display:flex;flex-direction:column;gap:12px}
+.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 8px 24px #0006}
+.status{font-size:18px;text-align:center;color:var(--gold2);min-height:26px}
+.status small{display:block;color:var(--muted);font-size:13px;margin-top:3px}
+label.row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;color:var(--muted);margin:8px 0}
+.seg{display:flex;background:#0003;border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;color:var(--muted);padding:7px 8px;border-radius:7px;font:14px inherit;font-family:inherit;cursor:pointer}
+.seg button.on{background:var(--gold);color:#22180c;font-weight:600}
+.btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.btn{border:1px solid var(--line);background:#0003;color:var(--text);padding:10px 8px;border-radius:9px;font-family:inherit;font-size:14px;cursor:pointer}
+.btn:hover{border-color:var(--gold)}
+.btn.primary{background:var(--gold);color:#22180c;border-color:var(--gold);font-weight:600}
+.moves{max-height:260px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;display:grid;grid-template-columns:38px 1fr 1fr;row-gap:2px}
+.moves div{padding:3px 6px;border-radius:5px}
+.moves .n{color:var(--muted)}
+.moves .cur{background:var(--gold);color:#22180c}
+.empty{color:var(--muted);font-size:13px;font-style:italic}
+h3{margin:0 0 8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal.show{display:flex}
+.modal .box{background:var(--panel2);border:1px solid var(--gold);border-radius:14px;padding:18px;text-align:center;max-width:92vw}
+.modal .box h2{margin:0 0 12px;color:var(--gold2);font-weight:600}
+.promo{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.promo button{width:min(22vw,110px);height:min(22vw,110px);border-radius:10px;border:1px solid var(--line);background:var(--light);cursor:pointer;padding:4px}
+.promo button:hover{outline:3px solid var(--gold)}
+.promo img{width:100%;height:100%;object-fit:contain}
+.endImg{width:120px;height:120px;object-fit:contain;filter:drop-shadow(0 6px 8px #000a)}
+.thinking{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-left:6px;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1>Royal Chess</h1></header>
+
+  <div class="boardCol">
+    <div class="player" id="pTop"><div class="name"><span class="dot"></span><span class="lbl"></span></div><div class="caps"></div></div>
+    <div class="boardFrame"><div id="board"></div></div>
+    <div class="player" id="pBot"><div class="name"><span class="dot"></span><span class="lbl"></span></div><div class="caps"></div></div>
+  </div>
+
+  <div class="side">
+    <div class="card"><div class="status" id="status"></div></div>
+    <div class="card">
+      <h3>Game</h3>
+      <label class="row">Opponent
+        <div class="seg" id="modeSeg"><button data-v="ai">Computer</button><button data-v="pvp">2 Players</button></div>
+      </label>
+      <label class="row" id="colorRow">You play
+        <div class="seg" id="colorSeg"><button data-v="w">White</button><button data-v="b">Black</button></div>
+      </label>
+      <label class="row" id="levelRow">Level
+        <div class="seg" id="levelSeg"><button data-v="1">Easy</button><button data-v="2">Medium</button><button data-v="3">Hard</button></div>
+      </label>
+      <div class="btns">
+        <button class="btn primary" id="newBtn">New game</button>
+        <button class="btn" id="undoBtn">Undo</button>
+        <button class="btn" id="flipBtn">Flip</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Moves</h3>
+      <div class="moves" id="moves"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="promoModal"><div class="box"><h2>Promote to</h2><div class="promo" id="promoOpts"></div></div></div>
+<div class="modal" id="endModal"><div class="box"><img class="endImg" id="endImg" alt=""><h2 id="endTitle"></h2><div id="endText" style="color:var(--muted);margin-bottom:14px"></div><button class="btn primary" id="endNew">New game</button> <button class="btn" id="endClose">View board</button></div></div>
+
+<script>
+"use strict";
+/* ================= Rules engine ================= */
+const FILES="abcdefgh";
+const IMG=k=>"pieces/"+k+".png";
+const NAMES={K:"King",Q:"Queen",R:"Rook",B:"Bishop",N:"Knight",P:"Pawn"};
+const sqName=i=>FILES[i&7]+(8-(i>>3));
+const KN=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+const KG=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+const DIAG=[[-1,-1],[-1,1],[1,-1],[1,1]], ORTH=[[-1,0],[1,0],[0,-1],[0,1]];
+const opp=c=>c==="w"?"b":"w";
+
+function startState(){
+  const b=Array(64).fill(null), back="RNBQKBNR";
+  for(let f=0;f<8;f++){b[f]="b"+back[f];b[8+f]="bP";b[48+f]="wP";b[56+f]="w"+back[f];}
+  return {b,t:"w",c:{K:1,Q:1,k:1,q:1},ep:-1,h:0,n:1};
+}
+function attacked(b,sq,by){
+  const r=sq>>3,f=sq&7;
+  const pr = by==="w"? r+1 : r-1;
+  if(pr>=0&&pr<8){ for(const df of[-1,1]){const ff=f+df; if(ff>=0&&ff<8&&b[pr*8+ff]===by+"P")return true;} }
+  for(const[dr,df]of KN){const rr=r+dr,ff=f+df; if(rr>=0&&rr<8&&ff>=0&&ff<8&&b[rr*8+ff]===by+"N")return true;}
+  for(const[dr,df]of KG){const rr=r+dr,ff=f+df; if(rr>=0&&rr<8&&ff>=0&&ff<8&&b[rr*8+ff]===by+"K")return true;}
+  for(const[dr,df]of DIAG){let rr=r+dr,ff=f+df; while(rr>=0&&rr<8&&ff>=0&&ff<8){const p=b[rr*8+ff]; if(p){ if(p[0]===by&&(p[1]==="B"||p[1]==="Q"))return true; break;} rr+=dr;ff+=df;}}
+  for(const[dr,df]of ORTH){let rr=r+dr,ff=f+df; while(rr>=0&&rr<8&&ff>=0&&ff<8){const p=b[rr*8+ff]; if(p){ if(p[0]===by&&(p[1]==="R"||p[1]==="Q"))return true; break;} rr+=dr;ff+=df;}}
+  return false;
+}
+const kingSq=(b,c)=>b.indexOf(c+"K");
+const inCheck=(s,c)=>attacked(s.b,kingSq(s.b,c),opp(c));
+
+function pseudo(s,capsOnly){
+  const b=s.b,c=s.t,e=opp(c),out=[];
+  const add=(from,to,extra)=>{const m={from,to,p:b[from],x:b[to]}; if(extra)Object.assign(m,extra); out.push(m);};
+  for(let i=0;i<64;i++){
+    const p=b[i]; if(!p||p[0]!==c)continue;
+    const r=i>>3,f=i&7,t=p[1];
+    if(t==="P"){
+      const d=c==="w"?-1:1, start=c==="w"?6:1, last=c==="w"?0:7;
+      const pushPromo=(to,x)=>{ if((to>>3)===last){for(const q of"QRBN")add(i,to,{promo:q});} else add(i,to,x); };
+      const one=i+8*d;
+      if(!capsOnly && !b[one]){ pushPromo(one); if(r===start&&!b[one+8*d])add(i,one+8*d,{dbl:1}); }
+      for(const df of[-1,1]){const ff=f+df; if(ff<0||ff>7)continue; const to=(r+d)*8+ff;
+        if(b[to]&&b[to][0]===e)pushPromo(to);
+        else if(to===s.ep)add(i,to,{epc:1,x:e+"P"});}
+    } else if(t==="N"||t==="K"){
+      for(const[dr,df]of(t==="N"?KN:KG)){const rr=r+dr,ff=f+df; if(rr<0||rr>7||ff<0||ff>7)continue; const to=rr*8+ff;
+        if(!b[to]){ if(!capsOnly)add(i,to);} else if(b[to][0]===e)add(i,to);}
+      if(t==="K"&&!capsOnly){
+        const home=c==="w"?60:4, ks=c==="w"?"K":"k", qs=c==="w"?"Q":"q";
+        if(i===home&&!attacked(b,i,e)){
+          if(s.c[ks]&&!b[i+1]&&!b[i+2]&&b[i+3]===c+"R"&&!attacked(b,i+1,e)&&!attacked(b,i+2,e))add(i,i+2,{castle:"K"});
+          if(s.c[qs]&&!b[i-1]&&!b[i-2]&&!b[i-3]&&b[i-4]===c+"R"&&!attacked(b,i-1,e)&&!attacked(b,i-2,e))add(i,i-2,{castle:"Q"});
+        }
+      }
+    } else {
+      const dirs=t==="B"?DIAG:t==="R"?ORTH:DIAG.concat(ORTH);
+      for(const[dr,df]of dirs){let rr=r+dr,ff=f+df;
+        while(rr>=0&&rr<8&&ff>=0&&ff<8){const to=rr*8+ff;
+          if(!b[to]){ if(!capsOnly)add(i,to);} else { if(b[to][0]===e)add(i,to); break; }
+          rr+=dr;ff+=df;}}
+    }
+  }
+  return out;
+}
+function make(s,m){
+  const b=s.b.slice(), c=s.t, cr={...s.c};
+  b[m.to]= m.promo? c+m.promo : m.p; b[m.from]=null;
+  if(m.epc) b[(m.from&~7)|(m.to&7)]=null;
+  if(m.castle==="K"){b[m.from+1]=b[m.from+3];b[m.from+3]=null;}
+  if(m.castle==="Q"){b[m.from-1]=b[m.from-4];b[m.from-4]=null;}
+  if(m.p[1]==="K"){ if(c==="w"){cr.K=0;cr.Q=0;} else {cr.k=0;cr.q=0;} }
+  for(const sq of[m.from,m.to]){ if(sq===63)cr.K=0; if(sq===56)cr.Q=0; if(sq===7)cr.k=0; if(sq===0)cr.q=0; }
+  return {b,t:opp(c),c:cr,ep:m.dbl?(m.from+m.to)/2:-1,h:(m.p[1]==="P"||m.x)?0:s.h+1,n:s.n+(c==="b"?1:0)};
+}
+function legal(s){ return pseudo(s).filter(m=>!inCheck(make(s,m),s.t)); }
+function posKey(s){ return s.b.map(p=>p||"-").join("")+s.t+(s.c.K?"K":"")+(s.c.Q?"Q":"")+(s.c.k?"k":"")+(s.c.q?"q":"")+s.ep; }
+function insufficient(b){
+  const ps=b.filter(p=>p&&p[1]!=="K");
+  if(ps.length===0)return true;
+  if(ps.length===1&&(ps[0][1]==="B"||ps[0][1]==="N"))return true;
+  return false;
+}
+function san(s,m,all){
+  let out;
+  if(m.castle) out= m.castle==="K"?"O-O":"O-O-O";
+  else if(m.p[1]==="P"){
+    out=(m.x? FILES[m.from&7]+"x":"")+sqName(m.to)+(m.promo?"="+m.promo:"");
+  } else {
+    const others=all.filter(o=>o!==m&&o.p===m.p&&o.to===m.to&&o.from!==m.from);
+    let dis="";
+    if(others.length){
+      const sameF=others.some(o=>(o.from&7)===(m.from&7)), sameR=others.some(o=>(o.from>>3)===(m.from>>3));
+      dis= !sameF? FILES[m.from&7] : !sameR? String(8-(m.from>>3)) : sqName(m.from);
+    }
+    out=m.p[1]+dis+(m.x?"x":"")+sqName(m.to);
+  }
+  const ns=make(s,m);
+  if(inCheck(ns,ns.t)) out+= legal(ns).length? "+":"#";
+  return out;
+}
+
+/* ================= Computer opponent ================= */
+const VAL={P:100,N:320,B:330,R:500,Q:900,K:0};
+const PST={
+P:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
+N:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+B:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+R:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
+Q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+K:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20],
+KE:[-50,-40,-30,-20,-20,-30,-40,-50,-30,-20,-10,0,0,-10,-20,-30,-30,-10,20,30,30,20,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,20,30,30,20,-10,-30,-30,-30,0,0,0,0,-30,-30,-50,-30,-30,-30,-30,-30,-30,-50]
+};
+function evaluate(s){
+  const b=s.b; let sc=0, mat=0;
+  for(let i=0;i<64;i++){const p=b[i]; if(p&&p[1]!=="K"&&p[1]!=="P")mat+=VAL[p[1]];}
+  const endgame=mat<=1600;
+  for(let i=0;i<64;i++){const p=b[i]; if(!p)continue;
+    const t=p[1], idx=p[0]==="w"?i:(56-(i&~7))+(i&7);
+    const v=VAL[t]+(t==="K"&&endgame?PST.KE:PST[t])[idx];
+    sc+= p[0]==="w"?v:-v;}
+  return s.t==="w"?sc:-sc;
+}
+const MATE=100000;
+let nodes=0, deadline=0, aborted=false;
+function order(ms){ return ms.sort((a,b)=>score(b)-score(a)); }
+function score(m){ return (m.x?10*VAL[m.x[1]]-VAL[m.p[1]]+1000:0)+(m.promo?800:0); }
+function quiesce(s,a,bt,d){
+  nodes++;
+  const sp=evaluate(s); if(sp>=bt)return bt; if(sp>a)a=sp;
+  if(d<=0)return a;
+  for(const m of order(pseudo(s,true))){
+    const ns=make(s,m); if(inCheck(ns,s.t))continue;
+    const v=-quiesce(ns,-bt,-a,d-1);
+    if(v>=bt)return bt; if(v>a)a=v;
+  }
+  return a;
+}
+function negamax(s,depth,a,bt,ply){
+  nodes++;
+  if((nodes&1023)===0&&performance.now()>deadline)aborted=true;
+  if(aborted)return 0;
+  if(ply>0&&s.h>=100)return 0;
+  if(depth<=0)return quiesce(s,a,bt,6);
+  const ms=order(legal(s));
+  if(!ms.length)return inCheck(s,s.t)? -MATE+ply : 0;
+  for(const m of ms){
+    const v=-negamax(make(s,m),depth-1,-bt,-a,ply+1);
+    if(v>=bt)return bt; if(v>a)a=v;
+  }
+  return a;
+}
+function bestMove(s,level){
+  const ms=order(legal(s)); if(!ms.length)return null;
+  const maxDepth={1:1,2:2,3:4}[level], timeMs={1:400,2:1500,3:3500}[level];
+  deadline=performance.now()+timeMs; aborted=false; nodes=0;
+  let best=ms[0], scored=ms.map(m=>({m,v:0}));
+  for(let d=1; d<=maxDepth; d++){
+    let a=-Infinity, cur=[];
+    for(const it of scored){
+      // Easy/Medium need exact scores for every root move (to pick among near-best ones)
+      const beta = (level<3 || a===-Infinity) ? MATE*2 : -a;
+      const v=-negamax(make(s,it.m),d-1,-MATE*2,beta,1);
+      if(aborted)break;
+      cur.push({m:it.m,v}); if(v>a)a=v;
+    }
+    if(aborted)break;
+    cur.sort((x,y)=>y.v-x.v); scored=cur; best=cur[0].m;
+  }
+  if(level===1){ // easy: pick among near-best moves with noise
+    const pool=scored.filter(x=>x.v>=scored[0].v-120);
+    best=pool[Math.floor(Math.random()*pool.length)].m;
+  } else if(level===2){
+    const pool=scored.filter(x=>x.v>=scored[0].v-25);
+    best=pool[Math.floor(Math.random()*pool.length)].m;
+  }
+  return best;
+}
+
+/* ================= App state ================= */
+let G, settings={mode:"ai",you:"w",level:2}, flipped=false, sel=-1, targets=[], busy=false, endShown=false;
+function freshGame(){ const g={s:startState(),hist:[],sans:[],keys:[],moves:[],over:null}; g.keys.push(posKey(g.s)); return g; }
+function newGame(){
+  G=freshGame(); sel=-1;targets=[];endShown=false;
+  flipped = settings.mode==="ai" && settings.you==="b";
+  save(); render(); maybeAI();
+}
+function save(){ try{localStorage.setItem("royalChess",JSON.stringify({G,settings,flipped}));}catch(e){} }
+function load(){ try{const d=JSON.parse(localStorage.getItem("royalChess")); if(d&&d.settings){settings={...settings,...d.settings};flipped=!!d.flipped; if(d.G&&d.G.s){G=d.G;return true;}}}catch(e){} return false; }
+
+function gameResult(){
+  const s=G.s, ms=legal(s);
+  if(!ms.length) return inCheck(s,s.t)? {type:"mate",winner:opp(s.t)} : {type:"stalemate"};
+  if(s.h>=100) return {type:"fifty"};
+  const k=G.keys[G.keys.length-1]; if(G.keys.filter(x=>x===k).length>=3) return {type:"repetition"};
+  if(insufficient(s.b)) return {type:"material"};
+  return null;
+}
+function applyMove(m){
+  const all=legal(G.s);
+  G.sans.push(san(G.s,m,all)); G.hist.push(G.s); G.moves.push({from:m.from,to:m.to});
+  G.s=make(G.s,m); G.keys.push(posKey(G.s));
+  G.over=gameResult(); sel=-1; targets=[];
+  save(); render();
+  if(G.over) setTimeout(showEnd,450); else maybeAI();
+}
+function isHumanTurn(){
+  if(G.over)return false;
+  return settings.mode==="pvp" || G.s.t===settings.you;
+}
+function maybeAI(){
+  if(G.over||settings.mode!=="ai"||G.s.t===settings.you)return;
+  busy=true; render();
+  setTimeout(()=>{
+    const m=bestMove(G.s,settings.level);
+    busy=false;
+    if(m) animateThen(m,()=>applyMove(m)); else render();
+  },60);
+}
+function undo(){
+  if(busy||!G.hist.length)return;
+  let n=1;
+  if(settings.mode==="ai"){ n = (G.s.t===settings.you)?2:1; if(G.hist.length<n) n=G.hist.length; }
+  for(let i=0;i<n;i++){ G.s=G.hist.pop(); G.sans.pop(); G.keys.pop(); G.moves.pop(); }
+  G.over=null; endShown=false; sel=-1; targets=[]; save(); render(); maybeAI();
+}
+
+/* ================= Rendering ================= */
+const boardEl=document.getElementById("board");
+function viewIdx(vi){ return flipped? 63-vi : vi; } // view cell -> board square
+function cellOf(sq){ return boardEl.children[flipped?63-sq:sq]; }
+function render(){
+  const s=G.s, last=G.moves[G.moves.length-1];
+  const chk = inCheck(s,s.t)? kingSq(s.b,s.t) : -1;
+  boardEl.innerHTML="";
+  for(let vi=0;vi<64;vi++){
+    const sq=viewIdx(vi), r=sq>>3, f=sq&7;
+    const d=document.createElement("div");
+    d.className="sq "+(((r+f)&1)?"d":"l");
+    d.dataset.sq=sq;
+    if(last&&(sq===last.from||sq===last.to))d.classList.add("last");
+    if(sq===sel)d.classList.add("sel");
+    if(sq===chk)d.classList.add("chk");
+    const vr=vi>>3, vf=vi&7;
+    if(vf===0){const c=document.createElement("span");c.className="coord r";c.textContent=8-r;d.appendChild(c);}
+    if(vr===7){const c=document.createElement("span");c.className="coord f";c.textContent=FILES[f];d.appendChild(c);}
+    const p=s.b[sq];
+    if(p){const im=document.createElement("img");im.className="pc";im.src=IMG(p);im.alt=(p[0]==="w"?"White ":"Black ")+NAMES[p[1]];im.draggable=false;d.appendChild(im);}
+    const tg=targets.find(m=>m.to===sq);
+    if(tg){const h=document.createElement("div");h.className="hint"+(s.b[sq]||tg.epc?" cap":"");d.appendChild(h);}
+    boardEl.appendChild(d);
+  }
+  renderSide();
+}
+function capturedBy(color){ // pieces of opp(color) missing from board
+  const start={P:8,N:2,B:2,R:2,Q:1}, cnt={P:0,N:0,B:0,R:0,Q:0}, e=opp(color);
+  for(const p of G.s.b) if(p&&p[0]===e&&cnt[p[1]]!==undefined)cnt[p[1]]++;
+  const out=[]; for(const t of"QRBNP"){ for(let i=0;i<Math.max(0,start[t]-cnt[t]);i++)out.push(e+t); }
+  return out;
+}
+function material(c){ let v=0; for(const p of G.s.b) if(p&&p[0]===c&&p[1]!=="K") v+=VAL[p[1]]; return v; }
+function renderSide(){
+  const s=G.s;
+  const bottomColor = flipped? "b":"w", topColor=opp(bottomColor);
+  const label=c=>{
+    const n=c==="w"?"White":"Black";
+    if(settings.mode==="pvp")return n;
+    return c===settings.you? "You ("+n+")" : "Computer ("+n+")";
+  };
+  const esc=t=>String(t).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  for(const [id,c] of [["pTop",topColor],["pBot",bottomColor]]){
+    const el=document.getElementById(id);
+    el.querySelector(".lbl").innerHTML=esc(label(c))+(busy&&s.t===c?'<span class="thinking"></span>':"");
+    el.querySelector(".dot").style.background= c==="w"?"#f3e6cf":"#1d1a17";
+    el.classList.toggle("active",!G.over&&s.t===c);
+    const caps=capturedBy(c), diff=Math.round((material(c)-material(opp(c)))/100);
+    el.querySelector(".caps").innerHTML=caps.map(k=>`<img src="${IMG(k)}" alt="">`).join("")+(diff>0?`<span class="adv">+${diff}</span>`:"");
+  }
+  // status
+  const st=document.getElementById("status"), side=s.t==="w"?"White":"Black";
+  const chkNote=inCheck(s,s.t)?"<small>Check!</small>":"<small>&nbsp;</small>";
+  if(G.over){ const r=resultText(); st.innerHTML=r.title+"<small>"+r.text+"</small>"; }
+  else if(busy) st.innerHTML="Computer is thinking…";
+  else st.innerHTML=(settings.mode==="ai"? (s.t===settings.you?"Your move":"Computer's move") : side+" to move")+chkNote;
+  // moves
+  const mv=document.getElementById("moves");
+  if(!G.sans.length){mv.innerHTML='<div class="empty" style="grid-column:1/-1">No moves yet</div>';}
+  else{
+    let h=""; for(let i=0;i<G.sans.length;i+=2){
+      h+=`<div class="n">${i/2+1}.</div><div class="${i===G.sans.length-1?"cur":""}">${G.sans[i]}</div><div class="${i+1===G.sans.length-1?"cur":""}">${G.sans[i+1]||""}</div>`;
+    } mv.innerHTML=h; mv.scrollTop=mv.scrollHeight;
+  }
+  // settings & buttons
+  setSeg("modeSeg",settings.mode); setSeg("colorSeg",settings.you); setSeg("levelSeg",String(settings.level));
+  const ai=settings.mode==="ai";
+  document.getElementById("colorRow").style.display=ai?"":"none";
+  document.getElementById("levelRow").style.display=ai?"":"none";
+  const show=(id,v)=>document.getElementById(id).style.display=v?"":"none";
+  
+}
+function setSeg(id,v){ const el=document.getElementById(id); if(!el)return; for(const b of el.children) b.classList.toggle("on",b.dataset.v===v); }
+function resultText(){
+  const o=G.over; if(!o)return {title:"",text:""};
+  const why={mate:"Checkmate",resign:"Resignation",stalemate:"Stalemate",fifty:"50-move rule",repetition:"Threefold repetition",material:"Insufficient material"}[o.type]||"";
+  if(o.winner){
+    const me = settings.mode==="ai"? settings.you : null;
+    let title;
+    if(me) title = o.winner===me? "You win!" : (settings.mode==="ai"?"Computer wins":"You lost");
+    else title=(o.winner==="w"?"White":"Black")+" wins!";
+    const text = o.type==="resign"? (o.winner==="w"?"Black":"White")+" resigned" : why;
+    return {title,text,img:IMG(o.winner+"K")};
+  }
+  return {title:"Draw",text:why,img:IMG("wQ")};
+}
+function showEnd(){
+  if(!G.over||endShown)return; endShown=true;
+  const r=resultText();
+  document.getElementById("endTitle").textContent=r.title;
+  document.getElementById("endText").textContent=r.text;
+  document.getElementById("endImg").src=r.img;
+  document.getElementById("endModal").classList.add("show");
+}
+
+/* ================= Interaction ================= */
+function selectSq(sq){
+  const p=G.s.b[sq];
+  if(p&&p[0]===G.s.t){ sel=sq; targets=legal(G.s).filter(m=>m.from===sq); }
+  else { sel=-1; targets=[]; }
+  render();
+}
+function tryMove(to){
+  const cands=targets.filter(m=>m.to===to);
+  if(!cands.length)return false;
+  if(cands[0].promo){ askPromo(G.s.t, q=>applyMove(cands.find(m=>m.promo===q))); }
+  else applyMove(cands[0]);
+  return true;
+}
+function askPromo(c,cb){
+  const box=document.getElementById("promoOpts"), md=document.getElementById("promoModal");
+  box.innerHTML="";
+  for(const q of"QRBN"){const b=document.createElement("button");b.innerHTML=`<img src="${IMG(c+q)}" alt="${NAMES[q]}">`;b.title=NAMES[q];
+    b.onclick=()=>{md.classList.remove("show");cb(q);}; box.appendChild(b);}
+  md.classList.add("show");
+}
+function animateThen(m,cb){
+  const fromCell=cellOf(m.from), toCell=cellOf(m.to), img=fromCell&&fromCell.querySelector(".pc");
+  if(!img){cb();return;}
+  const a=fromCell.getBoundingClientRect(), b=toCell.getBoundingClientRect();
+  img.style.zIndex=40; img.style.transform=`translate(${b.left-a.left}px,${b.top-a.top}px)`;
+  setTimeout(cb,210);
+}
+// pointer handling: click-to-move and drag-and-drop
+let drag=null;
+function sqFromPoint(x,y){
+  const r=boardEl.getBoundingClientRect(); if(x<r.left||y<r.top||x>=r.right||y>=r.bottom)return -1;
+  const vf=Math.floor((x-r.left)/(r.width/8)), vr=Math.floor((y-r.top)/(r.height/8));
+  return viewIdx(vr*8+vf);
+}
+boardEl.addEventListener("pointerdown",e=>{
+  if(busy||!isHumanTurn())return;
+  const sq=sqFromPoint(e.clientX,e.clientY); if(sq<0)return;
+  if(sel>=0 && targets.some(m=>m.to===sq)){ tryMove(sq); return; }
+  const p=G.s.b[sq];
+  if(p&&p[0]===G.s.t){
+    const wasSel=sel===sq;
+    selectSq(sq);
+    const img=cellOf(sq).querySelector(".pc");
+    const rect=cellOf(sq).getBoundingClientRect();
+    drag={sq,img,ox:rect.left+rect.width/2,oy:rect.top+rect.height/2,moved:false,wasSel};
+    boardEl.setPointerCapture(e.pointerId);
+  } else { sel=-1; targets=[]; render(); }
+});
+let hoverEl=null;
+boardEl.addEventListener("pointermove",e=>{
+  if(!drag)return;
+  const dx=e.clientX-drag.ox, dy=e.clientY-drag.oy;
+  if(!drag.moved && Math.hypot(dx,dy)<6)return;
+  drag.moved=true; drag.img.classList.add("drag");
+  drag.img.style.transform=`translate(${dx}px,${dy}px) scale(1.12)`;
+  const sq=sqFromPoint(e.clientX,e.clientY);
+  if(hoverEl)hoverEl.classList.remove("hover");
+  hoverEl= sq>=0&&targets.some(m=>m.to===sq)? cellOf(sq):null;
+  if(hoverEl)hoverEl.classList.add("hover");
+});
+function endDrag(e){
+  if(!drag)return;
+  const d=drag; drag=null; if(hoverEl){hoverEl.classList.remove("hover");hoverEl=null;}
+  if(!d.moved){ if(d.wasSel){sel=-1;targets=[];render();} return; }
+  const sq=sqFromPoint(e.clientX,e.clientY);
+  if(sq>=0&&sq!==d.sq&&targets.some(m=>m.to===sq)){ d.img.style.transform=""; d.img.classList.remove("drag"); tryMove(sq); }
+  else { d.img.classList.remove("drag"); d.img.style.transform=""; }
+}
+boardEl.addEventListener("pointerup",endDrag);
+boardEl.addEventListener("pointercancel",endDrag);
+
+for(const id of["modeSeg","colorSeg","levelSeg"]){
+  document.getElementById(id).addEventListener("click",e=>{
+    const v=e.target.dataset&&e.target.dataset.v; if(!v||busy)return;
+    if(id==="modeSeg"){ if(settings.mode!==v){ settings.mode=v; newGame(); } }
+    if(id==="colorSeg"){ if(settings.you!==v){settings.you=v; newGame();} }
+    if(id==="levelSeg"){ settings.level=+v; save(); render(); }
+  });
+}
+document.getElementById("newBtn").onclick=()=>{ if(!busy)newGame(); };
+document.getElementById("undoBtn").onclick=undo;
+document.getElementById("flipBtn").onclick=()=>{ flipped=!flipped; save(); render(); };
+document.getElementById("endNew").onclick=()=>{document.getElementById("endModal").classList.remove("show"); newGame();};
+document.getElementById("endClose").onclick=()=>document.getElementById("endModal").classList.remove("show");
+
+// preload images
+for(const c of"wb")for(const t of"KQRBNP"){const i=new Image();i.src=IMG(c+t);}
+if(load()&&G&&G.s){ if(settings.mode!=="ai"&&settings.mode!=="pvp"){settings.mode="ai";} render(); if(G.over){endShown=true;} else maybeAI(); }
+else { if(settings.mode!=="ai"&&settings.mode!=="pvp")settings.mode="ai"; newGame(); }
+</script>
+</body>
+</html>
